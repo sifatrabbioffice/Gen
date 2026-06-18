@@ -2,13 +2,13 @@ name: 100% Automated iOS App Build
 
 on:
   push:
-    branches: [ "main" ] # মেইন ব্রাঞ্চে পুশ করলেই বিল্ড শুরু হবে
+    branches: [ "main" ] # মেইন ব্রাঞ্চে পুশ করলেই বিল্ড পাইপলাইন চালু হবে
   pull_request:
     branches: [ "main" ]
 
 jobs:
   build:
-    runs-on: macos-14 # আইফোন ১৫ প্রো ম্যাক্স এবং আধুনিক আইওএস সাপোর্ট করার জন্য ম্যাক ওএস রানার
+    runs-on: macos-14 # আইফোন ১৫ প্রো ম্যাক্স সাপোর্ট করার জন্য ম্যাক ওএস রানার
 
     steps:
       # ১. গিটহাব রিপোজিটরি থেকে ভিডিও এবং ওয়ার্কফ্লো ফাইল রানারে নিয়ে আসা
@@ -39,7 +39,7 @@ jobs:
           }
           EOF
 
-      # ৫. ডাইনামিকভাবে সম্পূর্ণ ভিডিও ইন্টারফেস এবং সিকোয়েন্স অ্যানিমেশন কোড (ContentView.swift) তৈরি
+      # ۵. ডাইনামিকভাবে সম্পূর্ণ ভিডিও ইন্টারফেস এবং সিকোয়েন্স অ্যানিমেশন কোড (ContentView.swift) তৈরি
       - name: Auto-Generate ContentView.swift
         run: |
           cat << 'EOF' > BestApp/ContentView.swift
@@ -157,13 +157,14 @@ jobs:
           }
           EOF
 
-      # ৬. স্ক্রিপ্ট দিয়ে এক ক্লিকে আধুনিক 'BestApp.xcodeproj' ফাইল তৈরি করা
+      # ৬. ফিক্সড স্টেপ: XcodeGen-কে অবজেক্ট ফরম্যাট ডাউনগ্রেড করার নির্দেশ দেওয়া
       - name: Generate Xcode Project Structure using XcodeGen
         run: |
           cat << 'EOF' > project.yml
           name: BestApp
           options:
             bundleIdPrefix: com.autogen
+            minimumXcodeVersion: "15.0" # 👈 এই ম্যাজিক লাইনটি এক্সকোড ১৫-এর রিডেবল ফরম্যাট (Object Version 56) তৈরি করবে
           targets:
             BestApp:
               type: application
@@ -179,11 +180,11 @@ jobs:
           EOF
           xcodegen generate
 
-      # ৭. ফিক্সড স্টেপ: আধুনিক এক্সকোড ১৬ (Xcode 16) এনভায়রনমেন্ট সেটআপ করা (যা Format 77 সাপোর্ট করে)
-      - name: Set up Xcode Version (Xcode 16)
-        run: sudo xcode-select -s /Applications/Xcode_16.app
+      # ৭. রানারে থাকা নিশ্চিত এবং স্টেবল এক্সকোড ১৫.৪ এনভায়রনমেন্ট সেটআপ করা
+      - name: Set up Xcode Version (Xcode 15.4)
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
 
-      # ৮. জেনারেট হওয়া আধুনিক এক্সকোড প্রজেক্ট বিল্ড করা
+      # ৮. ডাউনগ্রেডেড ফরম্যাটের এক্সকোড প্রজেক্ট বিল্ড করা
       - name: Build Xcode Project (Unsigned)
         run: |
           xcodebuild clean build \
