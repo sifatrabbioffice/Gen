@@ -1,4 +1,224 @@
 name: Build Professional iOS App with Video & Animation
+name: Build Professional iOS App with Video & Animation
+
+on:
+  push:
+    branches: [ "main" ] # মেইন ব্রাঞ্চে কোড পুশ করার সাথে সাথে বিল্ড পাইপলাইন চালু হবে
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: macos-14 # আইফোন ১৫ প্রো ম্যাক্স (iOS 17+ SDK) সাপোর্ট করার জন্য ম্যাক ওএস সোনোমা রানার
+
+    steps:
+      # ১. গিটহাব রিপোজিটরি থেকে সব ফাইল ম্যাক রানারে ডাউনলোড করা
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # ২. ডিবাগিং স্টেপ: রানার কম্পিউটারে ফাইলগুলো আসলেই কোন লোকেশনে আছে তা লগে প্রিন্ট করা
+      - name: Diagnostic Directory Check
+        run: |
+          echo "=== বর্তমান ডিরেক্টরির ফাইল স্ট্রাকচার নিচে দেওয়া হলো ==="
+          ls -R
+
+      # ৩. ডাইনামিকভাবে অ্যাপের মেইন প্রবেশদ্বার (BestAppApp.swift) ফাইলটি তৈরি করা
+      - name: Inject BestAppApp.swift Code
+        run: |
+          mkdir -p BestApp
+          cat << 'EOF' > BestApp/BestAppApp.swift
+          import SwiftUI
+
+          @main
+          struct BestAppApp: App {
+              var body: some Scene {
+                  WindowGroup {
+                      ContentView()
+                  }
+              }
+          }
+          EOF
+
+      # ৪. ডাইনামিকভাবে সম্পূর্ণ ভিডিও ইন্টারফেস এবং সিকোয়েন্স অ্যানিমেশন কোড ContentView.swift-এ তৈরি করা
+      - name: Inject ContentView.swift Code
+        run: |
+          mkdir -p BestApp
+          cat << 'EOF' > BestApp/ContentView.swift
+          import SwiftUI
+          import AVKit
+
+          struct ContentView: View {
+              // অ্যাপের স্টেট ট্র্যাকিং (ভিডিও স্ক্রিন থেকে অ্যানিমেশন স্ক্রিনে যাওয়ার জন্য)
+              @State private var hasStartedAnimation = false
+              
+              // অ্যানিমেশন ও বৃত্তের স্কেল কন্ট্রোল ভ্যারিয়েবল
+              @State private var redWhiteCircleScale: CGFloat = 0
+              @State private var whiteCircleScale: CGFloat = 0
+              @State private var redCircleScale: CGFloat = 0
+              @State private var showText: Bool = false
+              
+              // ইনজেক্টেড ভিডিও ফাইল (appVideo.mp4) রিড করার জন্য ব্যাকএন্ড প্লেয়ার
+              @State private var player: AVPlayer? = {
+                  if let url = Bundle.main.url(forResource: "appVideo", withExtension: "mp4") {
+                      return AVPlayer(url: url)
+                  }
+                  return nil
+              }()
+
+              var body: some View {
+                  ZStack {
+                      // ব্যাকগ্রাউন্ড সম্পূর্ণ কালো রাখা হলো
+                      Color.black.ignoresSafeArea()
+                      
+                      if !hasStartedAnimation {
+                          // === ধাপ ১: ভিডিও প্লেয়ার এবং ইন্টারেক্টিভ বাটন ===
+                          ZStack {
+                              if let player = player {
+                                  VideoPlayer(player: player)
+                                      .disabled(true) // ভিডিওর ওপর ডিফল্ট প্লে/পজ বাটন হাইড করার প্রফেশনাল নিয়ম
+                                      .ignoresSafeArea()
+                                      .onAppear {
+                                          player.play()
+                                          // ভিডিও শেষ হলে যেন লুপ (Loop) আকারে আবার স্বয়ংক্রিয়ভাবে শুরু হয়
+                                          NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: player.currentItem, queue: .main) { _ in
+                                              player.seek(to: .zero)
+                                              player.play()
+                                          }
+                                      }
+                              } else {
+                                  // সেফটি ফলব্যাক: ভিডিও লোড না হলে এই টেক্সট দেখাবে
+                                  Text("appVideo.mp4 ফাইলটি প্রজেক্টের রুটে পাওয়া যায়নি।")
+                                      .foregroundColor(.gray)
+                                      .multilineTextAlignment(.center)
+                              }
+                              
+                              // স্ক্রিনের নিচে "ট্যাপ টু স্টার্ট" বাটন প্লেসমেন্ট
+                              VBox {
+                                  Spacer()
+                                  Button(action: {
+                                      player?.pause() // বাটন প্রেস করামাত্র ভিডিও ব্যাকগ্রাউন্ডে পজ হবে
+                                      withAnimation {
+                                          hasStartedAnimation = true // স্ক্রিন পরিবর্তন ট্রিগার
+                                      }
+                                      executeAnimationSequence() // বৃত্তের অ্যানিমেশন রান করা হলো
+                                  }) {
+                                      Text("ট্যাপ টু স্টার্ট")
+                                          .font(.system(size: 22, weight: .bold, design: .rounded))
+                                          .foregroundColor(.white)
+                                          .padding(.vertical, 16)
+                                          .padding(.horizontal, 45)
+                                          .background(
+                                              Capsule()
+                                                  .fill(Color.red.opacity(0.85))
+                                                  .shadow(color: .red.opacity(0.4), radius: 10, x: 0, y: 5)
+                                          )
+                                  }
+                                  .padding(.bottom, 60) // বটম থেকে আইফোন ১৫ প্রো ম্যাক্সের সেফ এরিয়া মার্জিন
+                              }
+                          }
+                      } else {
+                          // === ধাপ ২: ট্রানজিশনাল সার্কেল অ্যানিমেশন সিকোয়েন্স ===
+                          ZStack {
+                              // ১ম বৃত্ত: লাল-সাদা মিক্সড গ্রেডিয়েন্ট
+                              Circle()
+                                  .fill(RadialGradient(colors: [.red, .white], center: .center, startRadius: 10, endRadius: 150))
+                                  .scaleEffect(redWhiteCircleScale)
+                                  .frame(width: 400, height: 400)
+                              
+                              // ২য় বৃত্ত: পিওর হোয়াইট
+                              Circle()
+                                  .fill(Color.white)
+                                  .scaleEffect(whiteCircleScale)
+                                  .frame(width: 400, height: 400)
+                              
+                              // ৩য় বৃত্ত: পিওর রেড
+                              Circle()
+                                  .fill(Color.red)
+                                  .scaleEffect(redCircleScale)
+                                  .frame(width: 400, height: 400)
+                              
+                              // ফাইনাল টেক্সট মেসেজ পপ-আপ
+                              if showText {
+                                  Text("ইউ আর বেস্ট")
+                                      .font(.system(size: 46, weight: .black, design: .rounded))
+                                      .foregroundColor(.white)
+                                      .shadow(radius: 12)
+                                      .transition(.scale.combined(with: .opacity))
+                              }
+                          }
+                      }
+                  }
+              }
+              
+              // প্রফেশনাল টাইমিং চেইন মেথড (অ্যানিমেশন একের পর এক সাজানো)
+              private func executeAnimationSequence() {
+                  withAnimation(.easeInOut(duration: 1.0)) {
+                      redWhiteCircleScale = 3.5
+                  }
+                  
+                  DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                      withAnimation(.easeInOut(duration: 1.0)) {
+                          whiteCircleScale = 3.5
+                      }
+                  }
+                  
+                  DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
+                      withAnimation(.easeInOut(duration: 1.0)) {
+                          redCircleScale = 3.5
+                      }
+                  }
+                  
+                  DispatchQueue.main.asyncAfter(deadline: .now() + 2.4) {
+                      withAnimation(.spring(response: 0.6, dampingFraction: 0.5, blendDuration: 0)) {
+                          showText = true
+                      }
+                  }
+              }
+          }
+          EOF
+
+      # ৫. এক্সকোড এনভায়রনমেন্ট সেটআপ
+      - name: Set up Xcode Version
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+
+      # ৬. কোনো কোড সাইনিং ছাড়াই প্রোডাকশন লেভেল অ্যাপ কম্পাইল করা
+      - name: Build Xcode Project (Unsigned)
+        run: |
+          xcodebuild clean build \
+            -project BestApp.xcodeproj \
+            -scheme BestApp \
+            -sdk iphoneos \
+            -configuration Release \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            CONFIGURATION_BUILD_DIR=build/Release-iphoneos
+
+      # ৭. ভিডিও ফাইলটি সরাসরি কম্পাইল্ড অ্যাপ প্যাকেজে ইনজেক্ট করা এবং IPA তৈরি
+      - name: Inject Video Asset and Package IPA
+        run: |
+          if [ -f "appVideo.mp4" ]; then
+            cp appVideo.mp4 build/Release-iphoneos/BestApp.app/
+            echo "Success: appVideo.mp4 successfully injected into the compiled App Bundle!"
+          else
+            echo "Warning: appVideo.mp4 not found in root directory. App will build without video."
+          fi
+          
+          # Payload আর্কিটেকচার তৈরি এবং জিপ কম্প্রেস করে আইপিএ বানানো
+          mkdir -p build/Payload
+          cp -R build/Release-iphoneos/BestApp.app build/Payload/
+          cd build
+          zip -r BestApp.ipa Payload
+          echo "Unsigned IPA Packaging Completed Successfully!"
+
+      # ৮. তৈরি হওয়া ফাইনাল আইপিএ ফাইলটি গিটহাব আর্টিф্যাক্ট হিসেবে ডাউনলোডের জন্য সাবমিট করা
+      - name: Upload Finished IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BestApp-Professional-Unsigned
+          path: build/BestApp.ipa
+          retention-days: 7
 
 on:
   push:
