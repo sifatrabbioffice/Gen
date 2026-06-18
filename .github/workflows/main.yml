@@ -2,20 +2,20 @@ name: 100% Automated iOS App Build
 
 on:
   push:
-    branches: [ "main" ] # মেইন ব্রাঞ্চে পুশ করলেই ম্যাজিক শুরু হবে
+    branches: [ "main" ] # মেইন ব্রাঞ্চে পুশ করলেই বিল্ড শুরু হবে
   pull_request:
     branches: [ "main" ]
 
 jobs:
   build:
-    runs-on: macos-14 # আইফোন ১৫ প্রো ম্যাক্সের জন্য ম্যাক ওএস সোনোমা রানার
+    runs-on: macos-14 # আইফোন ১৫ প্রো ম্যাক্স এবং আধুনিক আইওএস সাপোর্ট করার জন্য ম্যাক ওএস রানার
 
     steps:
       # ১. গিটহাব রিপোজিটরি থেকে ভিডিও এবং ওয়ার্কফ্লো ফাইল রানারে নিয়ে আসা
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # ২. প্রফেশনাল টুল 'XcodeGen' ইনস্টল করা (যা xcodeproj ফাইলটি স্ক্রিপ্ট দিয়ে তৈরি করবে)
+      # ২. প্রফেশনাল টুল 'XcodeGen' ইনস্টল করা (যা xcodeproj ফাইল তৈরি করবে)
       - name: Install XcodeGen via Homebrew
         run: brew install xcodegen
 
@@ -157,7 +157,7 @@ jobs:
           }
           EOF
 
-      # ৬. ম্যাজিক স্টেপ: স্ক্রিপ্ট দিয়ে এক ক্লিকে 'BestApp.xcodeproj' ফাইল তৈরি করা
+      # ৬. স্ক্রিপ্ট দিয়ে এক ক্লিকে আধুনিক 'BestApp.xcodeproj' ফাইল তৈরি করা
       - name: Generate Xcode Project Structure using XcodeGen
         run: |
           cat << 'EOF' > project.yml
@@ -179,11 +179,11 @@ jobs:
           EOF
           xcodegen generate
 
-      # ৭. এক্সকোড এনভায়রনমেন্ট একটিভ করা
-      - name: Set up Xcode Version
-        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+      # ৭. ফিক্সড স্টেপ: আধুনিক এক্সকোড ১৬ (Xcode 16) এনভায়রনমেন্ট সেটআপ করা (যা Format 77 সাপোর্ট করে)
+      - name: Set up Xcode Version (Xcode 16)
+        run: sudo xcode-select -s /Applications/Xcode_16.app
 
-      # ৮. সদ্য তৈরি হওয়া এক্সকোড প্রজেক্ট বিল্ড করা
+      # ৮. জেনারেট হওয়া আধুনিক এক্সকোড প্রজেক্ট বিল্ড করা
       - name: Build Xcode Project (Unsigned)
         run: |
           xcodebuild clean build \
@@ -214,6 +214,6 @@ jobs:
       - name: Upload Finished IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: BestApp-100Percent-Automated-Unsigned
+          name: BestApp-Fixed-Automated-Unsigned
           path: build/BestApp.ipa
           retention-days: 7
